@@ -26,7 +26,9 @@ final class LLMClient {
 
         var baseURL = config.baseURL.trimmingCharacters(in: .whitespaces)
         while baseURL.hasSuffix("/") { baseURL = String(baseURL.dropLast()) }
-        guard let url = URL(string: baseURL + "/v1/chat/completions") else { return text }
+        guard let url = URL(string: baseURL + "/v1/chat/completions") else {
+            throw LLMError.badURL
+        }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -63,11 +65,13 @@ final class LLMClient {
     enum LLMError: LocalizedError {
         case badResponse(Int)
         case malformedResponse
+        case badURL
 
         var errorDescription: String? {
             switch self {
             case .badResponse(let code): return "LLM API returned HTTP \(code)"
             case .malformedResponse: return "LLM response format unexpected"
+            case .badURL: return "LLM API Base URL is invalid"
             }
         }
     }

@@ -28,7 +28,6 @@ final class FloatingPanelController {
         panel.orderFront(nil)
 
         guard let contentLayer = panel.contentView?.layer else { return }
-        contentLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
 
         let spring = CASpringAnimation(keyPath: "transform.scale")
         spring.damping = 12
@@ -58,6 +57,7 @@ final class FloatingPanelController {
         label?.textColor = NSColor.white.withAlphaComponent(0.6)
     }
 
+    @MainActor
     func updateLevel(_ level: Float) {
         waveformView?.update(level: level)
     }
@@ -128,6 +128,10 @@ final class FloatingPanelController {
         textWidthConstraint = widthConstraint
         label = tf
         panel = p
+
+        // Set anchor point once so spring animation scales from center
+        p.contentView?.wantsLayer = true
+        p.contentView?.layer?.anchorPoint = CGPoint(x: 0.5, y: 0.5)
     }
 
     private func updateTextWidth(animated: Bool) {

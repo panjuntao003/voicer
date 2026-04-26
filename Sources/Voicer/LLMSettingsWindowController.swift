@@ -1,10 +1,11 @@
 import AppKit
 
-final class LLMSettingsWindowController: NSWindowController {
+final class LLMSettingsWindowController: NSWindowController, NSWindowDelegate {
     private var baseURLField: NSTextField!
     private var apiKeyField: NSSecureTextField!
     private var modelField: NSTextField!
     private let llmClient = LLMClient()
+    private var testTask: Task<Void, Never>?
 
     convenience init() {
         let window = NSWindow(
@@ -16,8 +17,14 @@ final class LLMSettingsWindowController: NSWindowController {
         window.title = "LLM Settings"
         window.center()
         self.init(window: window)
+        window.delegate = self
         buildUI()
         loadSettings()
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        testTask?.cancel()
+        testTask = nil
     }
 
     private func buildUI() {
@@ -38,7 +45,7 @@ final class LLMSettingsWindowController: NSWindowController {
         contentView.addSubview(baseURLField)
 
         apiKeyField = NSSecureTextField(frame: NSRect(x: 138, y: 112, width: 262, height: 22))
-        apiKeyField.placeholderString = "sk-..."
+        apiKeyField.placeholderString = "sk-... (enter to change saved key)"
         contentView.addSubview(apiKeyField)
 
         modelField = NSTextField(frame: NSRect(x: 138, y: 72, width: 262, height: 22))
@@ -74,14 +81,16 @@ final class LLMSettingsWindowController: NSWindowController {
     }
 
     @objc private func test() {
+        testTask?.cancel()
         let config = LLMClient.Config(
             baseURL: baseURLField.stringValue,
             apiKey: apiKeyField.stringValue.isEmpty ? AppSettings.shared.llmAPIKey : apiKeyField.stringValue,
             model: modelField.stringValue.isEmpty ? AppSettings.shared.llmModel : modelField.stringValue
         )
-        Task {
+        testTask = Task {
             do {
                 let result = try await self.llmClient.refine(text: "测试 Python JSON", config: config)
+                guard !Task.isCancelled else { return }
                 await MainActor.run {
                     let alert = NSAlert()
                     alert.messageText = "LLM Test Passed"
@@ -89,6 +98,7 @@ final class LLMSettingsWindowController: NSWindowController {
                     alert.runModal()
                 }
             } catch {
+                guard !Task.isCancelled else { return }
                 await MainActor.run {
                     let alert = NSAlert()
                     alert.messageText = "LLM Test Failed"

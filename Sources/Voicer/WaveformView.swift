@@ -1,9 +1,10 @@
 import AppKit
+import QuartzCore
 
 final class WaveformView: NSView {
     private let weights: [Float] = [0.5, 0.8, 1.0, 0.75, 0.55]
     private var smoothed: [Float] = Array(repeating: 0, count: 5)
-    private var displayLink: CVDisplayLink?
+    private var displayLink: CADisplayLink?
 
     private let barWidth: CGFloat = 4
     private let barSpacing: CGFloat = 3
@@ -13,14 +14,25 @@ final class WaveformView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        setupDisplayLink()
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    deinit {
-        if let dl = displayLink { CVDisplayLinkStop(dl) }
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        displayLink?.invalidate()
+        displayLink = nil
+        if let window {
+            let link = window.displayLink(target: self, selector: #selector(tick))
+            link.add(to: .main, forMode: .common)
+            displayLink = link
+        }
     }
 
+    deinit {
+        displayLink?.invalidate()
+    }
+
+    @MainActor
     func update(level: Float) {
         let attack: Float = 0.4
         let release: Float = 0.15
@@ -33,19 +45,8 @@ final class WaveformView: NSView {
         }
     }
 
-    private func setupDisplayLink() {
-        CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
-        guard let dl = displayLink else { return }
-
-        let selfPtr = Unmanaged.passUnretained(self).toOpaque()
-        CVDisplayLinkSetOutputCallback(dl, { _, _, _, _, _, userInfo -> CVReturn in
-            guard let userInfo else { return kCVReturnSuccess }
-            let view = Unmanaged<WaveformView>.fromOpaque(userInfo).takeUnretainedValue()
-            DispatchQueue.main.async { view.setNeedsDisplay(view.bounds) }
-            return kCVReturnSuccess
-        }, selfPtr)
-
-        CVDisplayLinkStart(dl)
+    @objc private func tick() {
+        setNeedsDisplay(bounds)
     }
 
     override func draw(_ dirtyRect: NSRect) {

@@ -18,8 +18,21 @@ final class TextInjector {
 
         let originalSource = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
         let isCJK = detectCJK(source: originalSource)
-        if isCJK { switchToASCII() }
 
+        if isCJK {
+            switchToASCII {
+                self.doPaste(text: text, pasteboard: pasteboard, savedItems: savedItems,
+                             isCJK: isCJK, originalSource: originalSource)
+            }
+        } else {
+            doPaste(text: text, pasteboard: pasteboard, savedItems: savedItems,
+                    isCJK: false, originalSource: originalSource)
+        }
+    }
+
+    private func doPaste(text: String, pasteboard: NSPasteboard,
+                         savedItems: [NSPasteboardItem], isCJK: Bool,
+                         originalSource: TISInputSource) {
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
 
@@ -52,16 +65,23 @@ final class TextInjector {
         return cjkPrefixes.contains { sourceID.hasPrefix($0) }
     }
 
-    private func switchToASCII() {
+    private func switchToASCII(then completion: @escaping () -> Void) {
         let filter = [kTISPropertyInputSourceType: kTISTypeKeyboardLayout,
                       kTISPropertyInputSourceIsASCIICapable: true] as CFDictionary
-        guard let cfList = TISCreateInputSourceList(filter, false) else { return }
+        guard let cfList = TISCreateInputSourceList(filter, false) else {
+            completion()
+            return
+        }
         let list = cfList.takeRetainedValue() as! CFArray
-        guard CFArrayGetCount(list) > 0 else { return }
+        guard CFArrayGetCount(list) > 0 else {
+            completion()
+            return
+        }
         let ptr = CFArrayGetValueAtIndex(list, 0)!
         let ascii = Unmanaged<TISInputSource>.fromOpaque(ptr).takeUnretainedValue()
         TISSelectInputSource(ascii)
-        Thread.sleep(forTimeInterval: 0.05)
+        // Give the IME time to switch without blocking the main thread
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: completion)
     }
 
     private func simulatePaste() {
