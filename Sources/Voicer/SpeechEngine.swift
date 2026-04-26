@@ -33,18 +33,20 @@ final class SpeechEngine {
         request.shouldReportPartialResults = true
 
         recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
-            guard let self else { return }
-            if let result {
-                let text = result.bestTranscription.formattedString
-                self.lastTranscription = text
-                if result.isFinal {
-                    self.onFinalResult?(text)
-                } else {
-                    self.onPartialResult?(text)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let result {
+                    let text = result.bestTranscription.formattedString
+                    self.lastTranscription = text
+                    if result.isFinal {
+                        self.onFinalResult?(text)
+                    } else {
+                        self.onPartialResult?(text)
+                    }
                 }
-            }
-            if let error, (error as NSError).code != 301 {
-                self.onError?(error)
+                if let error, (error as NSError).code != 301 {
+                    self.onError?(error)
+                }
             }
         }
     }

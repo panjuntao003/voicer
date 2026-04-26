@@ -8,8 +8,8 @@ final class FnKeyMonitor {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var isFnDown = false
+    private var selfHandle: Unmanaged<FnKeyMonitor>?
 
-    // kVK_Function = 0x3F
     private let fnKeyCode: CGKeyCode = 0x3F
 
     func start() {
@@ -25,7 +25,8 @@ final class FnKeyMonitor {
             (1 << CGEventType.keyDown.rawValue) |
             (1 << CGEventType.keyUp.rawValue)
 
-        let selfPtr = Unmanaged.passRetained(self).toOpaque()
+        let handle = Unmanaged.passRetained(self)
+        selfHandle = handle
 
         eventTap = CGEvent.tapCreate(
             tap: .cghidEventTap,
@@ -37,11 +38,13 @@ final class FnKeyMonitor {
                 let monitor = Unmanaged<FnKeyMonitor>.fromOpaque(userInfo).takeUnretainedValue()
                 return monitor.handle(proxy: proxy, type: type, event: event)
             },
-            userInfo: selfPtr
+            userInfo: handle.toOpaque()
         )
 
         guard let tap = eventTap else {
             print("[FnKeyMonitor] Failed to create event tap")
+            selfHandle?.release()
+            selfHandle = nil
             return
         }
 
@@ -59,6 +62,8 @@ final class FnKeyMonitor {
         }
         eventTap = nil
         runLoopSource = nil
+        selfHandle?.release()
+        selfHandle = nil
     }
 
     private func handle(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {

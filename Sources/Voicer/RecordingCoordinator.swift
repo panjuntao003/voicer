@@ -20,8 +20,10 @@ final class RecordingCoordinator {
         audioEngine.onBuffer = { [weak self] buffer in
             guard let self else { return }
             let level = AudioEngine.rms(buffer: buffer)
-            DispatchQueue.main.async { self.onLevel?(level) }
-            self.speechEngine.append(buffer: buffer)
+            DispatchQueue.main.async {
+                self.onLevel?(level)
+                self.speechEngine.append(buffer: buffer)
+            }
         }
 
         speechEngine.onPartialResult = { [weak self] text in
