@@ -2,7 +2,7 @@ APP_NAME = Voicer
 BUNDLE_ID = com.voicer.app
 BUILD_DIR = .build
 APP_BUNDLE = $(BUILD_DIR)/$(APP_NAME).app
-BINARY = $(BUILD_DIR)/release/Voicer
+BINARY = $(shell swift build -c release --show-bin-path 2>/dev/null)/Voicer
 
 .PHONY: build run install clean
 
@@ -18,7 +18,7 @@ run: build
 	open "$(APP_BUNDLE)"
 
 install: build
-	cp -r "$(APP_BUNDLE)" /Applications/
+	sudo cp -r "$(APP_BUNDLE)" /Applications/
 
 clean:
 	rm -rf "$(BUILD_DIR)"
