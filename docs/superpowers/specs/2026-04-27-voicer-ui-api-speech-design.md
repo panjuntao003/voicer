@@ -180,21 +180,74 @@ form-data:
 
 ## 5. LLM Settings 配置变更
 
-在现有 `LLMSettingsWindowController` 窗口中新增：
+### 5.1 Provider 预设下拉选择（新增）
+
+将原有的"API Base URL"文本输入框替换为 **Provider 下拉选择框**，用户只需：
+1. 选择预设 Provider
+2. 填入 API Key
+3. （可选）修改 Model
+
+**UI 布局更新：**
 
 ```
 ┌─────────────────────────────────────────┐
 │  LLM Settings                             │
 │                                           │
-│  API Base URL:  [________________]        │
+│  Provider:      [▼ OpenAI           ]     │
+│  API Base URL:  [https://api.openai.com]  │  ← 预设时隐藏/只读，自定义时显示
 │  API Key:       [________________]        │
-│  Model:         [________________]        │
+│  Model:         [gpt-4o-mini      ]       │
 │                                           │
 │  ☑ Use API for Speech Recognition         │
 │  Speech Model:  [whisper-1      ]         │
 │                                           │
 │  [Test]  [Save]                           │
 └─────────────────────────────────────────┘
+```
+
+**预设 Provider 列表（18 个，全部兼容 OpenAI 格式）：**
+
+| Provider | Base URL | Default Model |
+|---|---|---|
+| OpenAI | https://api.openai.com | gpt-4o-mini |
+| DeepSeek | https://api.deepseek.com | deepseek-chat |
+| Moonshot (Kimi) | https://api.moonshot.cn | moonshot-v1-8k |
+| 智谱 AI (GLM) | https://open.bigmodel.cn/api/paas | glm-4-flash |
+| ByteDance (豆包) | https://ark.cn-beijing.volces.com/api | doubao-lite-4k |
+| Alibaba (通义千问) | https://dashscope.aliyuncs.com/compatible-mode | qwen-turbo |
+| Baichuan (百川) | https://api.baichuan-ai.com | Baichuan4 |
+| MiniMax | https://api.minimax.chat | abab6.5s-chat |
+| 零一万物 (01.AI) | https://api.lingyiwanwu.com | yi-lightning |
+| 阶跃星辰 (StepFun) | https://api.stepfun.com | step-1-8k |
+| Groq | https://api.groq.com/openai | llama-3.1-8b |
+| xAI (Grok) | https://api.x.ai | grok-2 |
+| Mistral AI | https://api.mistral.ai | mistral-small |
+| Cohere | https://api.cohere.ai | command-r |
+| Perplexity | https://api.perplexity.ai | llama-3.1-sonar-small |
+| Fireworks AI | https://api.fireworks.ai/inference | accounts/fireworks/models/llama-v3p1-8b |
+| SiliconFlow | https://api.siliconflow.cn | Qwen/Qwen2.5-7B-Instruct |
+| 自定义 (Custom) | — | — |
+
+> 注：所有预设 Provider 均采用 OpenAI 兼容 API 格式（`/v1/chat/completions`），确保与现有 `LLMClient` 的请求逻辑一致。不兼容此格式的 Provider（如 Azure OpenAI、Anthropic、Google Gemini、百度文心等）暂不在预设列表中，用户可通过「自定义」模式自行配置。
+
+**交互逻辑：**
+- 选择预设 Provider：自动填充 Base URL（隐藏）和 Model；用户仅需填 Key
+- 选择"自定义"：显示 Base URL 输入框，读/写 `AppSettings.llmBaseURL`
+- 切换 Provider 时：自动覆盖 Model 为对应默认值（用户通常是切换整套配置）
+- 窗口高度从 220px 略增至 240px 以容纳下拉框
+
+**数据模型：**
+- 新增 `llmProviderName: String`（默认 `"OpenAI"`），用于持久化用户选择的 Provider
+- 保留 `llmBaseURL`，仅在"自定义"模式下读写
+
+**向后兼容（升级迁移）：**
+老用户没有 `llmProviderName` 字段。首次读取时，根据已有 `llmBaseURL` 反向匹配预设列表中的 `baseURL`，匹配成功则设为对应 Provider，否则设为"自定义"。
+
+### 5.2 Speech API 开关（原有）
+
+```
+☑ Use API for Speech Recognition
+Speech Model:  [whisper-1      ]
 ```
 
 新增字段：
@@ -225,12 +278,32 @@ Base URL 和 API Key 复用 LLM 的配置。
 final class AppSettings {
     // 现有字段...
     
-    // 新增
+    // LLM Provider 预设（新增）
+    var llmProviderName: String  // 默认 "OpenAI"
+    
+    // Speech API（原有）
     @UserDefault("speechAPIEnabled", defaultValue: false)
     var speechAPIEnabled: Bool
     
     @UserDefault("speechModel", defaultValue: "whisper-1")
     var speechModel: String
+}
+```
+
+### LLMProvider 数据模型（新增）
+
+```swift
+struct LLMProvider {
+    let name: String           // 显示名称，如 "OpenAI"
+    let baseURL: String        // 如 "https://api.openai.com"
+    let defaultModel: String   // 如 "gpt-4o-mini"
+    
+    static let all: [LLMProvider] = [
+        LLMProvider(name: "OpenAI", baseURL: "https://api.openai.com", defaultModel: "gpt-4o-mini"),
+        LLMProvider(name: "DeepSeek", baseURL: "https://api.deepseek.com", defaultModel: "deepseek-chat"),
+        // ... 其余 22 个预设
+        LLMProvider(name: "Custom", baseURL: "", defaultModel: ""),
+    ]
 }
 ```
 
@@ -244,8 +317,9 @@ final class AppSettings {
 | `WaveformView.swift` | 修改 | 增加光晕效果，优化动画参数 |
 | `RecordingCoordinator.swift` | 修改 | 集成 API 识别流程，双引擎协调 |
 | `SpeechAPIClient.swift` | 新增 | 负责音频文件上传和 Whisper API 调用 |
-| `LLMSettingsWindowController.swift` | 修改 | 新增 Speech API 开关和模型输入框 |
+| `LLMSettingsWindowController.swift` | 修改 | 改为 Provider 下拉框；新增 Speech API 开关和模型输入框 |
 | `MenuBarManager.swift` | 修改 | 移除 Language 菜单 |
+| `LLMProvider.swift` | 新增 | 18 个兼容 OpenAI 格式的预设 Provider 数据模型 |
 | `AppSettings.swift` | 修改 | 新增 `speechAPIEnabled`、`speechModel` |
 | `AppDelegate.swift` | 修改 | 调整流程：本地预览 → API 识别 → LLM 润色 |
 
@@ -291,6 +365,10 @@ final class AppSettings {
 | 本地 Speech 实时预览保留 | 是 | 提供即时反馈，让用户知道麦克风在工作 |
 | 移除 Language 菜单 | 是 | API 自动检测 + 本地 fallback，不再需要手动选择 |
 | 完成时不显示文字 | 是 | 文字直接注入输入框，减少视觉干扰 |
+| Provider 下拉替代手动 URL | 是 | 减少用户配置成本，避免填错 URL；自定义选项保留灵活性 |
+| 切换 Provider 覆盖 Model | 是 | 用户切换 Provider 通常意味着换整套配置，自动同步更自然 |
+| 预设 Provider 隐藏 Base URL | 是 | 大多数用户不需要看到/修改 URL，界面更简洁 |
+| 自定义模式保留 Base URL 输入 | 是 | 兼容私有部署、代理、自托管等场景 |
 
 ---
 
