@@ -69,40 +69,37 @@ final class FloatingPanelController {
 
         if let screen = NSScreen.main {
             let x = screen.visibleFrame.midX - width / 2
-            let y = screen.visibleFrame.maxY - panelHeight - 12
-            panel.setFrame(NSRect(x: x, y: y, width: width, height: panelHeight), display: true)
+            let targetY = screen.visibleFrame.maxY - panelHeight - 12
+            // Start above the screen (hidden)
+            let startY = screen.visibleFrame.maxY + 20
+            panel.setFrame(NSRect(x: x, y: startY, width: width, height: panelHeight), display: true)
+
+            // Animate sliding down from top
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = 0.4
+                ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.32, 0.72, 0, 1.0)
+                panel.animator().setFrame(NSRect(x: x, y: targetY, width: width, height: panelHeight), display: true)
+                panel.animator().alphaValue = 1.0
+            })
         }
 
-        panel.alphaValue = 0
+        panel.alphaValue = 1.0
         panel.orderFront(nil)
-
-        guard let contentLayer = panel.contentView?.layer else { return }
-
-        let spring = CASpringAnimation(keyPath: "transform.scale")
-        spring.damping = 12
-        spring.initialVelocity = 8
-        spring.fromValue = 0.7
-        spring.toValue = 1.0
-        spring.duration = 0.35
-        spring.isRemovedOnCompletion = true
-        contentLayer.add(spring, forKey: "entry")
-
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.25
-            panel.animator().alphaValue = 1.0
-        }
     }
 
     private func animateHide() {
-        guard let panel else { return }
+        guard let panel, let screen = NSScreen.main else { return }
+        let currentFrame = panel.frame
+
+        // Animate sliding up and fading out
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.22
+            ctx.duration = 0.25
+            ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.32, 0.72, 0, 1.0)
+            panel.animator().setFrame(
+                NSRect(x: currentFrame.minX, y: screen.visibleFrame.maxY + 20, width: currentFrame.width, height: panelHeight),
+                display: true
+            )
             panel.animator().alphaValue = 0
-            let scale = CABasicAnimation(keyPath: "transform.scale")
-            scale.fromValue = 1.0
-            scale.toValue = 0.9
-            scale.duration = 0.22
-            panel.contentView?.layer?.add(scale, forKey: "exit")
         }, completionHandler: {
             panel.orderOut(nil)
         })
