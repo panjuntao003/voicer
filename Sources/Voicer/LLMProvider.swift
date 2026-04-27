@@ -20,6 +20,7 @@ struct LLMProvider: Equatable {
         LLMProvider(name: "Fireworks AI", baseURL: "https://api.fireworks.ai/inference", defaultModel: "accounts/fireworks/models/llama-v3p1-8b", supportsSpeech: true),
         LLMProvider(name: "SiliconFlow", baseURL: "https://api.siliconflow.cn", defaultModel: "Qwen/Qwen2.5-7B-Instruct", supportsSpeech: true),
         LLMProvider(name: "Perplexity", baseURL: "https://api.perplexity.ai", defaultModel: "sonar", supportsSpeech: false),
+        LLMProvider(name: "MiniMax (海螺)", baseURL: "https://api.minimaxi.com", defaultModel: "MiniMax-M2.1", supportsSpeech: false),
         LLMProvider(name: "Custom", baseURL: "", defaultModel: "", supportsSpeech: false),
     ]
 
