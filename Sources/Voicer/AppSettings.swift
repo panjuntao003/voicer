@@ -10,6 +10,9 @@ final class AppSettings {
         case llmBaseURL = "voicer.llm.baseURL"
         case llmAPIKey = "voicer.llm.apiKey"
         case llmModel = "voicer.llm.model"
+        case llmProviderName = "voicer.llm.providerName"
+        case speechAPIEnabled = "voicer.speech.apiEnabled"
+        case speechModel = "voicer.speech.model"
     }
 
     var language: String {
@@ -23,7 +26,7 @@ final class AppSettings {
     }
 
     var llmBaseURL: String {
-        get { defaults.string(forKey: Key.llmBaseURL.rawValue) ?? "https://api.openai.com" }
+        get { defaults.string(forKey: Key.llmBaseURL.rawValue) ?? "" }
         set { defaults.set(newValue, forKey: Key.llmBaseURL.rawValue) }
     }
 
@@ -33,7 +36,33 @@ final class AppSettings {
     }
 
     var llmModel: String {
-        get { defaults.string(forKey: Key.llmModel.rawValue) ?? "gpt-4o-mini" }
+        get { defaults.string(forKey: Key.llmModel.rawValue) ?? "" }
         set { defaults.set(newValue, forKey: Key.llmModel.rawValue) }
+    }
+
+    var llmProviderName: String {
+        get {
+            if let stored = defaults.string(forKey: Key.llmProviderName.rawValue), !stored.isEmpty {
+                return stored
+            }
+            // 向后兼容：老用户根据 baseURL 反向匹配
+            let url = llmBaseURL
+            if let matched = LLMProvider.all.first(where: { $0.baseURL == url && $0.name != "Custom" }) {
+                defaults.set(matched.name, forKey: Key.llmProviderName.rawValue)
+                return matched.name
+            }
+            return "Custom"
+        }
+        set { defaults.set(newValue, forKey: Key.llmProviderName.rawValue) }
+    }
+
+    var speechAPIEnabled: Bool {
+        get { defaults.bool(forKey: Key.speechAPIEnabled.rawValue) }
+        set { defaults.set(newValue, forKey: Key.speechAPIEnabled.rawValue) }
+    }
+
+    var speechModel: String {
+        get { defaults.string(forKey: Key.speechModel.rawValue) ?? "whisper-1" }
+        set { defaults.set(newValue, forKey: Key.speechModel.rawValue) }
     }
 }
