@@ -10,9 +10,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var refinementTask: Task<Void, Never>?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Use .accessory activation policy instead of LSUIElement
-        // This keeps the app in the menu bar (no dock icon) but allows
-        // text fields to properly receive keyboard input and paste events
         NSApp.setActivationPolicy(.accessory)
 
         menuBar.setup()
@@ -36,9 +33,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.onRecordingStopped = { [weak self] rawText in
             guard let self else { return }
             let settings = AppSettings.shared
+            let textToInject = rawText.isEmpty ? rawText : rawText
 
-            if settings.llmEnabled && !settings.llmAPIKey.isEmpty && !rawText.isEmpty {
-                panel.showProcessing(message: "正在润色…")
+            // Always inject raw text immediately so user sees something
+            panel.hide()
+            injector.inject(textToInject)
+
+            // If LLM is enabled, refine in background and replace clipboard
+            if settings.llmEnabled && !settings.llmAPIKey.isEmpty && !rawText.isEmpty && rawText.count > 5 {
                 let provider = LLMProvider.provider(named: settings.llmProviderName)
                 let baseURL = provider.name == "Custom" ? settings.llmBaseURL : provider.baseURL
                 let config = LLMClient.Config(
@@ -50,14 +52,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 refinementTask = Task {
                     let refined = (try? await self.llmClient.refine(text: rawText, config: config)) ?? rawText
                     guard !Task.isCancelled else { return }
-                    await MainActor.run {
-                        self.panel.hide()
-                        self.injector.inject(refined)
-                    }
+                    // Save refined text to clipboard history and system clipboard
+                    ClipboardHistory.shared.add(refined)
+                    ClipboardHistory.shared.copyToClipboard(refined)
                 }
-            } else {
-                panel.hide()
-                injector.inject(rawText)
             }
         }
 

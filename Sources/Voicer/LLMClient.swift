@@ -42,7 +42,7 @@ final class LLMClient {
                 ["role": "system", "content": Self.systemPrompt],
                 ["role": "user", "content": text]
             ],
-            "max_tokens": 2000,
+            "max_tokens": min(text.count * 3, 1000),
             "temperature": 0
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
