@@ -129,7 +129,7 @@ final class FloatingPanelController {
 
     private func configureForProcessing(message: String) {
         label?.stringValue = message
-        label?.textColor = NSColor.white.withAlphaComponent(0.8)
+        label?.textColor = NSColor.white
         waveformView?.isHidden = true
         statusIndicator?.isHidden = true
         spinner?.isHidden = false
@@ -157,6 +157,13 @@ final class FloatingPanelController {
         p.hasShadow = true
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
+        let container = NSView(frame: NSRect(origin: .zero, size: frame.size))
+        container.wantsLayer = true
+        container.layer?.cornerRadius = cornerRadius
+        container.layer?.masksToBounds = true
+        container.layer?.backgroundColor = NSColor(white: 0.12, alpha: 0.92).cgColor
+        container.autoresizingMask = [.width, .height]
+
         let blur = NSVisualEffectView(frame: NSRect(origin: .zero, size: frame.size))
         blur.material = .hudWindow
         blur.blendingMode = .behindWindow
@@ -165,7 +172,9 @@ final class FloatingPanelController {
         blur.layer?.cornerRadius = cornerRadius
         blur.layer?.masksToBounds = true
         blur.autoresizingMask = [.width, .height]
-        p.contentView = blur
+
+        container.addSubview(blur)
+        p.contentView = container
 
         // Waveform
         let wv = WaveformView(frame: NSRect(
@@ -224,8 +233,8 @@ final class FloatingPanelController {
         // Text shadow for crispness
         let shadow = NSShadow()
         shadow.shadowOffset = NSSize(width: 0, height: -1)
-        shadow.shadowBlurRadius = 0
-        shadow.shadowColor = NSColor.black.withAlphaComponent(0.25)
+        shadow.shadowBlurRadius = 2
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.6)
         tf.shadow = shadow
 
         blur.addSubview(tf)
@@ -289,7 +298,7 @@ final class FloatingPanelController {
 
     private func startStatusPulse() {
         guard let dotLayer = statusIndicator?.layer else { return }
-        pulseAnimation?.removeAnimation(forKey: "pulse")
+        dotLayer.removeAnimation(forKey: "pulse")
         let pulse = CABasicAnimation(keyPath: "opacity")
         pulse.fromValue = 1.0
         pulse.toValue = 0.3
