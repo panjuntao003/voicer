@@ -4,9 +4,6 @@ final class MenuBarManager: NSObject {
     private var statusItem: NSStatusItem!
     private var llmToggleItem: NSMenuItem!
     private var settingsWindowController: LLMSettingsWindowController?
-    private var historyWindowController: NSWindowController?
-
-    var onLanguageChange: ((String) -> Void)?
 
     func setup() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -67,8 +64,9 @@ final class MenuBarManager: NSObject {
                 object: settingsWindowController?.window
             )
         }
+        NSApp.activate(ignoringOtherApps: true)
         settingsWindowController?.showWindow(nil)
-        NSApp.activate()
+        settingsWindowController?.window?.orderFrontRegardless()
     }
 
     @objc private func settingsWindowClosed() {
@@ -80,11 +78,6 @@ final class MenuBarManager: NSObject {
               index < ClipboardHistory.shared.entries.count else { return }
         let text = ClipboardHistory.shared.entries[index].text
         ClipboardHistory.shared.copyToClipboard(text)
-    }
-
-    @objc private func deleteHistoryItem(_ sender: NSMenuItem) {
-        guard let index = sender.representedObject as? Int else { return }
-        ClipboardHistory.shared.delete(at: index)
     }
 
     @objc private func clearHistory() {
@@ -104,8 +97,8 @@ extension MenuBarManager: NSMenuDelegate {
         } else {
             for (index, entry) in entries.prefix(20).enumerated() {
                 let preview = String(entry.text.prefix(60)).replacingOccurrences(of: "\n", with: " ")
-                let time = formatTime(entry.timestamp)
-                let item = NSMenuItem(title: "\(preview)", action: #selector(copyHistoryItem(_:)), keyEquivalent: "")
+                let item = NSMenuItem(title: preview, action: #selector(copyHistoryItem(_:)), keyEquivalent: "")
+                item.target = self
                 item.representedObject = index
                 item.toolTip = entry.text
                 menu.addItem(item)
@@ -119,16 +112,5 @@ extension MenuBarManager: NSMenuDelegate {
             clearItem.target = self
             menu.addItem(clearItem)
         }
-    }
-
-    private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        let now = Date()
-        if Calendar.current.isDateInToday(date) {
-            formatter.dateFormat = "HH:mm"
-        } else {
-            formatter.dateFormat = "MM/dd HH:mm"
-        }
-        return formatter.string(from: date)
     }
 }

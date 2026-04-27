@@ -19,6 +19,7 @@ final class LLMSettingsWindowController: NSWindowController, NSWindowDelegate {
         )
         window.title = "LLM Settings"
         window.center()
+        window.level = .floating
         self.init(window: window)
         window.delegate = self
         buildUI()
