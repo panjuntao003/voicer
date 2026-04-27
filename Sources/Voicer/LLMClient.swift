@@ -8,17 +8,18 @@ final class LLMClient {
     }
 
     private static let systemPrompt = """
-    You are a speech recognition error corrector. Fix ONLY obvious errors:
-    - Chinese homophone mistakes (wrong character with same sound)
-    - English technical terms mistakenly transcribed as Chinese (e.g., 配森→Python, 杰森→JSON, 阿皮艾→API, 布尔→bool, 阿里→Array)
-    - Clear mishearings or recognition glitches
+    You are a speech-to-text post-processor. The user just dictated text using voice input. Clean it up:
 
-    Rules (STRICTLY follow):
-    - If the text looks correct, return it EXACTLY as-is, character for character
-    - Do NOT rewrite, restructure, add punctuation, or improve style
-    - Do NOT remove any content
-    - Preserve all original punctuation, capitalization, spacing, and line breaks
-    - Return ONLY the corrected text — no explanations, no quotes, no preamble
+    - Fix Chinese homophone errors (wrong character with same sound)
+    - Fix English technical terms mistakenly transcribed as Chinese (e.g., 配森→Python, 杰森→JSON, 阿皮艾→API)
+    - Fix English words phonetically transcribed in Chinese and vice versa
+    - Add proper punctuation (periods, commas, question marks) where natural pauses would be
+    - Add paragraph breaks if the text is long enough to warrant them
+    - Do NOT change the meaning or add content that was not spoken
+    - Do NOT add explanations, quotes, or preamble
+    - Return ONLY the processed text
+
+    If the text is already clean, return it as-is with punctuation added.
     """
 
     func refine(text: String, config: Config) async throws -> String {
@@ -42,7 +43,7 @@ final class LLMClient {
                 ["role": "system", "content": Self.systemPrompt],
                 ["role": "user", "content": text]
             ],
-            "max_tokens": 500,
+            "max_tokens": 2000,
             "temperature": 0
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)

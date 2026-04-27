@@ -62,7 +62,7 @@ final class LLMSettingsWindowController: NSWindowController, NSWindowDelegate {
 
         // API Key
         apiKeyField = NSSecureTextField(frame: NSRect(x: 138, y: 222, width: 262, height: 22))
-        apiKeyField.placeholderString = "sk-... (enter to change)"
+        apiKeyField.placeholderString = AppSettings.shared.llmAPIKey.isEmpty ? "Enter API key" : "✓ Saved — enter to change"
         contentView.addSubview(apiKeyField)
 
         // Model
