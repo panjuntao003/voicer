@@ -3,3 +3,4 @@
 *.d
 Package.resolved
 .DS_Store
+.superpowers/
