@@ -5,6 +5,9 @@ final class TextInjector {
     func inject(_ text: String) {
         guard !text.isEmpty else { return }
 
+        // Always save to clipboard history before injecting
+        ClipboardHistory.shared.add(text)
+
         let pasteboard = NSPasteboard.general
         let savedItems: [NSPasteboardItem] = (pasteboard.pasteboardItems ?? []).map { item in
             let copy = NSPasteboardItem()

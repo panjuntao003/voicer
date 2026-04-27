@@ -4,6 +4,9 @@ final class MenuBarManager: NSObject {
     private var statusItem: NSStatusItem!
     private var llmToggleItem: NSMenuItem!
     private var settingsWindowController: LLMSettingsWindowController?
+    private var historyWindowController: NSWindowController?
+
+    var onLanguageChange: ((String) -> Void)?
 
     func setup() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -15,6 +18,15 @@ final class MenuBarManager: NSObject {
 
     private func buildMenu() -> NSMenu {
         let menu = NSMenu()
+
+        // Clipboard History submenu
+        let historyMenu = NSMenu()
+        historyMenu.delegate = self
+        let historyItem = NSMenuItem(title: "Clipboard History", action: nil, keyEquivalent: "")
+        historyItem.submenu = historyMenu
+        menu.addItem(historyItem)
+
+        menu.addItem(.separator())
 
         // LLM submenu
         let llmMenu = NSMenu()
@@ -61,5 +73,62 @@ final class MenuBarManager: NSObject {
 
     @objc private func settingsWindowClosed() {
         settingsWindowController = nil
+    }
+
+    @objc private func copyHistoryItem(_ sender: NSMenuItem) {
+        guard let index = sender.representedObject as? Int,
+              index < ClipboardHistory.shared.entries.count else { return }
+        let text = ClipboardHistory.shared.entries[index].text
+        ClipboardHistory.shared.copyToClipboard(text)
+    }
+
+    @objc private func deleteHistoryItem(_ sender: NSMenuItem) {
+        guard let index = sender.representedObject as? Int else { return }
+        ClipboardHistory.shared.delete(at: index)
+    }
+
+    @objc private func clearHistory() {
+        ClipboardHistory.shared.clear()
+    }
+}
+
+extension MenuBarManager: NSMenuDelegate {
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        let entries = ClipboardHistory.shared.entries
+
+        if entries.isEmpty {
+            let emptyItem = NSMenuItem(title: "No history yet", action: nil, keyEquivalent: "")
+            emptyItem.isEnabled = false
+            menu.addItem(emptyItem)
+        } else {
+            for (index, entry) in entries.prefix(20).enumerated() {
+                let preview = String(entry.text.prefix(60)).replacingOccurrences(of: "\n", with: " ")
+                let time = formatTime(entry.timestamp)
+                let item = NSMenuItem(title: "\(preview)", action: #selector(copyHistoryItem(_:)), keyEquivalent: "")
+                item.representedObject = index
+                item.toolTip = entry.text
+                menu.addItem(item)
+            }
+        }
+
+        menu.addItem(NSMenuItem.separator())
+
+        if !entries.isEmpty {
+            let clearItem = NSMenuItem(title: "Clear History", action: #selector(clearHistory), keyEquivalent: "")
+            clearItem.target = self
+            menu.addItem(clearItem)
+        }
+    }
+
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        let now = Date()
+        if Calendar.current.isDateInToday(date) {
+            formatter.dateFormat = "HH:mm"
+        } else {
+            formatter.dateFormat = "MM/dd HH:mm"
+        }
+        return formatter.string(from: date)
     }
 }

@@ -161,19 +161,13 @@ final class FloatingPanelController {
         container.wantsLayer = true
         container.layer?.cornerRadius = cornerRadius
         container.layer?.masksToBounds = true
-        container.layer?.backgroundColor = NSColor(white: 0.12, alpha: 0.92).cgColor
+        container.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.88).cgColor
+
+        // Subtle border for depth
+        container.layer?.borderWidth = 0.5
+        container.layer?.borderColor = NSColor.white.withAlphaComponent(0.15).cgColor
+
         container.autoresizingMask = [.width, .height]
-
-        let blur = NSVisualEffectView(frame: NSRect(origin: .zero, size: frame.size))
-        blur.material = .hudWindow
-        blur.blendingMode = .behindWindow
-        blur.state = .active
-        blur.wantsLayer = true
-        blur.layer?.cornerRadius = cornerRadius
-        blur.layer?.masksToBounds = true
-        blur.autoresizingMask = [.width, .height]
-
-        container.addSubview(blur)
         p.contentView = container
 
         // Waveform
@@ -184,7 +178,7 @@ final class FloatingPanelController {
             height: waveformHeight
         ))
         wv.autoresizingMask = [.minYMargin, .maxYMargin]
-        blur.addSubview(wv)
+        container.addSubview(wv)
         waveformView = wv
 
         // Status indicator (green pulse dot)
@@ -194,12 +188,12 @@ final class FloatingPanelController {
         dot.layer?.cornerRadius = 4
         dot.translatesAutoresizingMaskIntoConstraints = false
         dot.isHidden = true
-        blur.addSubview(dot)
+        container.addSubview(dot)
         statusIndicator = dot
 
         NSLayoutConstraint.activate([
-            dot.trailingAnchor.constraint(equalTo: blur.trailingAnchor, constant: -horizontalPadding),
-            dot.centerYAnchor.constraint(equalTo: blur.centerYAnchor),
+            dot.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -horizontalPadding),
+            dot.centerYAnchor.constraint(equalTo: container.centerYAnchor),
             dot.widthAnchor.constraint(equalToConstant: 8),
             dot.heightAnchor.constraint(equalToConstant: 8),
         ])
@@ -210,12 +204,12 @@ final class FloatingPanelController {
         spinner.controlSize = .small
         spinner.translatesAutoresizingMaskIntoConstraints = false
         spinner.isHidden = true
-        blur.addSubview(spinner)
+        container.addSubview(spinner)
         self.spinner = spinner
 
         NSLayoutConstraint.activate([
-            spinner.leadingAnchor.constraint(equalTo: blur.leadingAnchor, constant: horizontalPadding),
-            spinner.centerYAnchor.constraint(equalTo: blur.centerYAnchor),
+            spinner.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: horizontalPadding),
+            spinner.centerYAnchor.constraint(equalTo: container.centerYAnchor),
             spinner.widthAnchor.constraint(equalToConstant: 16),
             spinner.heightAnchor.constraint(equalToConstant: 16),
         ])
@@ -237,13 +231,13 @@ final class FloatingPanelController {
         shadow.shadowColor = NSColor.black.withAlphaComponent(0.6)
         tf.shadow = shadow
 
-        blur.addSubview(tf)
+        container.addSubview(tf)
 
         let textLeft = horizontalPadding + waveformWidth + gap
         let widthConstraint = tf.widthAnchor.constraint(equalToConstant: minTextWidth)
         NSLayoutConstraint.activate([
-            tf.leadingAnchor.constraint(equalTo: blur.leadingAnchor, constant: textLeft),
-            tf.centerYAnchor.constraint(equalTo: blur.centerYAnchor),
+            tf.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: textLeft),
+            tf.centerYAnchor.constraint(equalTo: container.centerYAnchor),
             widthConstraint,
             tf.trailingAnchor.constraint(lessThanOrEqualTo: dot.leadingAnchor, constant: -gap)
         ])
