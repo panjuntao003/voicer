@@ -10,6 +10,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var refinementTask: Task<Void, Never>?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Use .accessory activation policy instead of LSUIElement
+        // This keeps the app in the menu bar (no dock icon) but allows
+        // text fields to properly receive keyboard input and paste events
+        NSApp.setActivationPolicy(.accessory)
+
         menuBar.setup()
 
         coordinator.onRecordingStarted = { [weak self] in
