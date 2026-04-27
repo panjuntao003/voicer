@@ -11,7 +11,7 @@ final class SpeechEngine {
     private var recognitionTask: SFSpeechRecognitionTask?
     private var lastTranscription: String = ""
 
-    var locale: Locale = Locale(identifier: "zh-CN") {
+    var locale: Locale = .autoupdatingCurrent {
         didSet { recognizer = SFSpeechRecognizer(locale: locale) }
     }
 
