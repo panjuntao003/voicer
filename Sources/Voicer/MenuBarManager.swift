@@ -65,8 +65,11 @@ final class MenuBarManager: NSObject {
             )
         }
         NSApp.activate(ignoringOtherApps: true)
-        settingsWindowController?.showWindow(nil)
-        settingsWindowController?.window?.orderFrontRegardless()
+        settingsWindowController?.window?.makeKeyAndOrderFront(nil)
+        // Force first text field to become first responder
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            self.settingsWindowController?.window?.makeFirstResponder(nil)
+        }
     }
 
     @objc private func settingsWindowClosed() {
