@@ -15,12 +15,13 @@ final class FloatingPanelController {
 
     private let panelHeight: CGFloat = 56
     private let cornerRadius: CGFloat = 28
-    private let horizontalPadding: CGFloat = 18
+    private let padding: CGFloat = 18
+    private let gap: CGFloat = 10
 
-    // Recording state: fixed compact width
-    private let recordingWidth: CGFloat = 160
-    // Processing state: fixed slightly wider
-    private let processingWidth: CGFloat = 220
+    // Recording: waveform + "正在聆听…" + green dot
+    private let recordingWidth: CGFloat = 200
+    // Processing: spinner + "正在识别…" / "正在润色…"
+    private let processingWidth: CGFloat = 240
 
     // MARK: - Public API
 
@@ -33,8 +34,7 @@ final class FloatingPanelController {
     }
 
     func updateTranscription(_ text: String) {
-        // No longer showing transcription text on panel
-        // Panel only shows state indicators
+        // Panel only shows state indicators, no real-time text
     }
 
     @MainActor
@@ -67,7 +67,6 @@ final class FloatingPanelController {
         if panel == nil { buildPanel() }
         guard let panel = panel else { return }
 
-        // Set fixed width
         if let screen = NSScreen.main {
             let x = screen.visibleFrame.midX - width / 2
             let y = screen.visibleFrame.maxY - panelHeight - 12
@@ -118,6 +117,8 @@ final class FloatingPanelController {
         statusIndicator?.isHidden = false
         spinner?.isHidden = true
         spinner?.stopAnimation(nil)
+        // Position label between waveform and dot
+        label?.alignment = .left
         startStatusPulse()
     }
 
@@ -128,6 +129,8 @@ final class FloatingPanelController {
         statusIndicator?.isHidden = true
         spinner?.isHidden = false
         spinner?.startAnimation(nil)
+        // Center label in processing state
+        label?.alignment = .center
         stopStatusPulse()
     }
 
@@ -158,9 +161,9 @@ final class FloatingPanelController {
         container.autoresizingMask = [.width, .height]
         p.contentView = container
 
-        // Waveform
+        // Waveform (left side for recording state)
         let wv = WaveformView(frame: NSRect(
-            x: horizontalPadding,
+            x: padding,
             y: (panelHeight - 32) / 2,
             width: 44,
             height: 32
@@ -169,7 +172,7 @@ final class FloatingPanelController {
         container.addSubview(wv)
         waveformView = wv
 
-        // Status indicator (green pulse dot)
+        // Status indicator (green pulse dot, right side)
         let dot = NSView(frame: NSRect(x: 0, y: 0, width: 8, height: 8))
         dot.wantsLayer = true
         dot.layer?.backgroundColor = NSColor.systemGreen.cgColor
@@ -180,13 +183,13 @@ final class FloatingPanelController {
         statusIndicator = dot
 
         NSLayoutConstraint.activate([
-            dot.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -horizontalPadding),
+            dot.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -padding),
             dot.centerYAnchor.constraint(equalTo: container.centerYAnchor),
             dot.widthAnchor.constraint(equalToConstant: 8),
             dot.heightAnchor.constraint(equalToConstant: 8),
         ])
 
-        // Spinner
+        // Spinner (left side for processing state)
         let spinner = NSProgressIndicator(frame: NSRect(x: 0, y: 0, width: 16, height: 16))
         spinner.style = .spinning
         spinner.controlSize = .small
@@ -196,13 +199,13 @@ final class FloatingPanelController {
         self.spinner = spinner
 
         NSLayoutConstraint.activate([
-            spinner.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: horizontalPadding),
+            spinner.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: padding),
             spinner.centerYAnchor.constraint(equalTo: container.centerYAnchor),
             spinner.widthAnchor.constraint(equalToConstant: 16),
             spinner.heightAnchor.constraint(equalToConstant: 16),
         ])
 
-        // Label
+        // Label — positioned between waveform and dot for recording, centered for processing
         let tf = NSTextField(labelWithString: "")
         tf.translatesAutoresizingMaskIntoConstraints = false
         tf.font = .systemFont(ofSize: 15, weight: .semibold)
@@ -211,7 +214,7 @@ final class FloatingPanelController {
         tf.maximumNumberOfLines = 1
         tf.drawsBackground = false
         tf.isBordered = false
-        tf.alignment = .center
+        tf.alignment = .left
 
         let shadow = NSShadow()
         shadow.shadowOffset = NSSize(width: 0, height: -1)
@@ -222,7 +225,8 @@ final class FloatingPanelController {
         container.addSubview(tf)
 
         NSLayoutConstraint.activate([
-            tf.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            tf.leadingAnchor.constraint(equalTo: wv.trailingAnchor, constant: gap),
+            tf.trailingAnchor.constraint(equalTo: dot.leadingAnchor, constant: -gap),
             tf.centerYAnchor.constraint(equalTo: container.centerYAnchor),
         ])
         label = tf
