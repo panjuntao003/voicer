@@ -2,18 +2,15 @@ import AppKit
 
 final class LLMSettingsWindowController: NSWindowController, NSWindowDelegate {
     private var providerPopup: NSPopUpButton!
-    private var baseURLField: NSTextField!
     private var apiKeyField: NSSecureTextField!
     private var modelField: NSTextField!
     private var speechToggle: NSButton!
     private var speechModelField: NSTextField!
     private var speechWarningLabel: NSTextField!
-    private let llmClient = LLMClient()
-    private var testTask: Task<Void, Never>?
 
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 310),
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 240),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -27,19 +24,18 @@ final class LLMSettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
-        testTask?.cancel()
-        testTask = nil
+        // cleanup if needed
     }
 
     private func buildUI() {
         guard let contentView = window?.contentView else { return }
 
         let labels: [(String, CGFloat)] = [
-            ("Provider:", 262),
-            ("API Key:", 222),
-            ("Model:", 182),
-            ("", 142),  // speech toggle row
-            ("Speech Model:", 102),
+            ("Provider:", 192),
+            ("API Key:", 152),
+            ("Model:", 112),
+            ("", 72),   // speech toggle
+            ("Speech Model:", 42),
         ]
 
         for (text, y) in labels {
@@ -51,7 +47,7 @@ final class LLMSettingsWindowController: NSWindowController, NSWindowDelegate {
         }
 
         // Provider popup
-        providerPopup = NSPopUpButton(frame: NSRect(x: 138, y: 262, width: 262, height: 24))
+        providerPopup = NSPopUpButton(frame: NSRect(x: 138, y: 192, width: 262, height: 24))
         providerPopup.target = self
         providerPopup.action = #selector(providerChanged)
         for provider in LLMProvider.all {
@@ -61,41 +57,36 @@ final class LLMSettingsWindowController: NSWindowController, NSWindowDelegate {
         contentView.addSubview(providerPopup)
 
         // API Key
-        apiKeyField = NSSecureTextField(frame: NSRect(x: 138, y: 222, width: 262, height: 22))
+        apiKeyField = NSSecureTextField(frame: NSRect(x: 138, y: 152, width: 262, height: 22))
         apiKeyField.placeholderString = AppSettings.shared.llmAPIKey.isEmpty ? "Enter API key" : "✓ Saved — enter to change"
         contentView.addSubview(apiKeyField)
 
         // Model
-        modelField = NSTextField(frame: NSRect(x: 138, y: 182, width: 262, height: 22))
+        modelField = NSTextField(frame: NSRect(x: 138, y: 112, width: 262, height: 22))
         modelField.placeholderString = "gpt-4o-mini"
         contentView.addSubview(modelField)
 
         // Speech toggle
         speechToggle = NSButton(checkboxWithTitle: "Use API for Speech Recognition",
                                 target: self, action: #selector(toggleSpeechAPI))
-        speechToggle.frame = NSRect(x: 138, y: 142, width: 262, height: 20)
+        speechToggle.frame = NSRect(x: 138, y: 72, width: 262, height: 20)
         contentView.addSubview(speechToggle)
 
         // Speech Model
-        speechModelField = NSTextField(frame: NSRect(x: 138, y: 102, width: 262, height: 22))
+        speechModelField = NSTextField(frame: NSRect(x: 138, y: 42, width: 262, height: 22))
         speechModelField.placeholderString = "whisper-1"
         contentView.addSubview(speechModelField)
 
         // Speech provider warning
         speechWarningLabel = NSTextField(labelWithString: "")
-        speechWarningLabel.frame = NSRect(x: 138, y: 78, width: 280, height: 18)
+        speechWarningLabel.frame = NSRect(x: 138, y: 18, width: 280, height: 18)
         speechWarningLabel.font = .systemFont(ofSize: 11)
         speechWarningLabel.textColor = .secondaryLabelColor
         contentView.addSubview(speechWarningLabel)
 
-        // Buttons
-        let testButton = NSButton(title: "Test LLM", target: self, action: #selector(test))
-        testButton.frame = NSRect(x: 200, y: 12, width: 100, height: 32)
-        testButton.bezelStyle = .rounded
-        contentView.addSubview(testButton)
-
+        // Save button
         let saveButton = NSButton(title: "Save", target: self, action: #selector(save))
-        saveButton.frame = NSRect(x: 320, y: 12, width: 80, height: 32)
+        saveButton.frame = NSRect(x: 320, y: 8, width: 80, height: 32)
         saveButton.bezelStyle = .rounded
         saveButton.keyEquivalent = "\r"
         contentView.addSubview(saveButton)
@@ -142,13 +133,12 @@ final class LLMSettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @objc private func save() {
         let s = AppSettings.shared
-        let providerName = currentProviderName()
-        s.llmProviderName = providerName
-        let provider = LLMProvider.provider(named: providerName)
+        if let providerName = providerPopup.selectedItem?.title {
+            s.llmProviderName = providerName.replacingOccurrences(of: " 🎤", with: "")
+        }
+        let provider = LLMProvider.provider(named: s.llmProviderName)
         if provider.name != "Custom" {
             s.llmBaseURL = provider.baseURL
-        } else {
-            s.llmBaseURL = baseURLField.stringValue
         }
         if !apiKeyField.stringValue.isEmpty {
             s.llmAPIKey = apiKeyField.stringValue
@@ -157,38 +147,5 @@ final class LLMSettingsWindowController: NSWindowController, NSWindowDelegate {
         s.speechAPIEnabled = speechToggle.state == .on
         s.speechModel = speechModelField.stringValue
         window?.close()
-    }
-
-    @objc private func test() {
-        testTask?.cancel()
-        let providerName = currentProviderName()
-        let provider = LLMProvider.provider(named: providerName)
-        let baseURL = provider.name == "Custom" ? AppSettings.shared.llmBaseURL : provider.baseURL
-        let config = LLMClient.Config(
-            baseURL: baseURL,
-            apiKey: apiKeyField.stringValue.isEmpty ? AppSettings.shared.llmAPIKey : apiKeyField.stringValue,
-            model: modelField.stringValue.isEmpty ? provider.defaultModel : modelField.stringValue
-        )
-        testTask = Task {
-            do {
-                let result = try await self.llmClient.refine(text: "测试 Python JSON", config: config)
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    let alert = NSAlert()
-                    alert.messageText = "LLM Test Passed"
-                    alert.informativeText = "Response: \(result)"
-                    alert.runModal()
-                }
-            } catch {
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    let alert = NSAlert()
-                    alert.messageText = "LLM Test Failed"
-                    alert.informativeText = error.localizedDescription
-                    alert.alertStyle = .critical
-                    alert.runModal()
-                }
-            }
-        }
     }
 }
