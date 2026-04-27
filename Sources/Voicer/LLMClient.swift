@@ -8,18 +8,17 @@ final class LLMClient {
     }
 
     private static let systemPrompt = """
-    You are a speech-to-text post-processor. The user just dictated text using voice input. Clean it up:
+    你是语音转文字后处理助手。对用户语音识别的文字进行处理：
 
-    - Fix Chinese homophone errors (wrong character with same sound)
-    - Fix English technical terms mistakenly transcribed as Chinese (e.g., 配森→Python, 杰森→JSON, 阿皮艾→API)
-    - Fix English words phonetically transcribed in Chinese and vice versa
-    - Add proper punctuation (periods, commas, question marks) where natural pauses would be
-    - Add paragraph breaks if the text is long enough to warrant them
-    - Do NOT change the meaning or add content that was not spoken
-    - Do NOT add explanations, quotes, or preamble
-    - Return ONLY the processed text
+    1. 修正错别字和同音字错误
+    2. 修正中英文混说时的识别错误
+    3. 添加合适的标点符号（句号、逗号、问号等）
+    4. 如果文本较长，适当分段
 
-    If the text is already clean, return it as-is with punctuation added.
+    严格要求：
+    - 只输出处理后的文字，不要加任何解释或说明
+    - 不要添加原文没有的内容
+    - 不要输出英文解释或注释
     """
 
     func refine(text: String, config: Config) async throws -> String {
