@@ -12,17 +12,15 @@ final class FloatingPanelController {
     private var label: NSTextField?
     private var statusIndicator: NSView?
     private var spinner: NSProgressIndicator?
-    private var textWidthConstraint: NSLayoutConstraint?
-    private var currentState: PanelState = .hidden
 
     private let panelHeight: CGFloat = 56
     private let cornerRadius: CGFloat = 28
-    private let horizontalPadding: CGFloat = 20
-    private let waveformWidth: CGFloat = 44
-    private let waveformHeight: CGFloat = 32
-    private let gap: CGFloat = 12
-    private let minTextWidth: CGFloat = 160
-    private let maxTextWidth: CGFloat = 560
+    private let horizontalPadding: CGFloat = 18
+
+    // Recording state: fixed compact width
+    private let recordingWidth: CGFloat = 160
+    // Processing state: fixed slightly wider
+    private let processingWidth: CGFloat = 220
 
     // MARK: - Public API
 
@@ -35,11 +33,8 @@ final class FloatingPanelController {
     }
 
     func updateTranscription(_ text: String) {
-        guard let label else { return }
-        label.stringValue = text
-        label.textColor = .white
-        updateTextWidth(animated: true)
-        positionPanel()
+        // No longer showing transcription text on panel
+        // Panel only shows state indicators
     }
 
     @MainActor
@@ -56,27 +51,28 @@ final class FloatingPanelController {
     private func transition(to state: PanelState) {
         switch state {
         case .recording:
-            showPanel()
+            showPanel(width: recordingWidth)
             configureForRecording()
         case .processing(let message):
-            guard panel != nil else { return }
+            showPanel(width: processingWidth)
             configureForProcessing(message: message)
         case .hidden:
             animateHide()
         }
-        currentState = state
     }
 
     // MARK: - Panel Lifecycle
 
-    private func showPanel() {
+    private func showPanel(width: CGFloat) {
         if panel == nil { buildPanel() }
         guard let panel = panel else { return }
 
-        label?.stringValue = ""
-        label?.textColor = .white
-        updateTextWidth(animated: false)
-        positionPanel()
+        // Set fixed width
+        if let screen = NSScreen.main {
+            let x = screen.visibleFrame.midX - width / 2
+            let y = screen.visibleFrame.maxY - panelHeight - 12
+            panel.setFrame(NSRect(x: x, y: y, width: width, height: panelHeight), display: true)
+        }
 
         panel.alphaValue = 0
         panel.orderFront(nil)
@@ -122,28 +118,23 @@ final class FloatingPanelController {
         statusIndicator?.isHidden = false
         spinner?.isHidden = true
         spinner?.stopAnimation(nil)
-        updateTextWidth(animated: true)
-        positionPanel()
         startStatusPulse()
     }
 
     private func configureForProcessing(message: String) {
         label?.stringValue = message
-        label?.textColor = NSColor.white
+        label?.textColor = .white
         waveformView?.isHidden = true
         statusIndicator?.isHidden = true
         spinner?.isHidden = false
         spinner?.startAnimation(nil)
-        updateTextWidth(animated: true)
-        positionPanel()
         stopStatusPulse()
     }
 
     // MARK: - Panel Construction
 
     private func buildPanel() {
-        let initialWidth = horizontalPadding * 2 + waveformWidth + gap + minTextWidth
-        let frame = NSRect(x: 0, y: 0, width: initialWidth, height: panelHeight)
+        let frame = NSRect(x: 0, y: 0, width: recordingWidth, height: panelHeight)
 
         let p = NSPanel(
             contentRect: frame,
@@ -162,20 +153,17 @@ final class FloatingPanelController {
         container.layer?.cornerRadius = cornerRadius
         container.layer?.masksToBounds = true
         container.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.88).cgColor
-
-        // Subtle border for depth
         container.layer?.borderWidth = 0.5
         container.layer?.borderColor = NSColor.white.withAlphaComponent(0.15).cgColor
-
         container.autoresizingMask = [.width, .height]
         p.contentView = container
 
         // Waveform
         let wv = WaveformView(frame: NSRect(
             x: horizontalPadding,
-            y: (panelHeight - waveformHeight) / 2,
-            width: waveformWidth,
-            height: waveformHeight
+            y: (panelHeight - 32) / 2,
+            width: 44,
+            height: 32
         ))
         wv.autoresizingMask = [.minYMargin, .maxYMargin]
         container.addSubview(wv)
@@ -217,14 +205,14 @@ final class FloatingPanelController {
         // Label
         let tf = NSTextField(labelWithString: "")
         tf.translatesAutoresizingMaskIntoConstraints = false
-        tf.font = .systemFont(ofSize: 16, weight: .semibold)
+        tf.font = .systemFont(ofSize: 15, weight: .semibold)
         tf.textColor = .white
         tf.lineBreakMode = .byTruncatingTail
         tf.maximumNumberOfLines = 1
         tf.drawsBackground = false
         tf.isBordered = false
+        tf.alignment = .center
 
-        // Text shadow for crispness
         let shadow = NSShadow()
         shadow.shadowOffset = NSSize(width: 0, height: -1)
         shadow.shadowBlurRadius = 2
@@ -233,15 +221,10 @@ final class FloatingPanelController {
 
         container.addSubview(tf)
 
-        let textLeft = horizontalPadding + waveformWidth + gap
-        let widthConstraint = tf.widthAnchor.constraint(equalToConstant: minTextWidth)
         NSLayoutConstraint.activate([
-            tf.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: textLeft),
+            tf.centerXAnchor.constraint(equalTo: container.centerXAnchor),
             tf.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            widthConstraint,
-            tf.trailingAnchor.constraint(lessThanOrEqualTo: dot.leadingAnchor, constant: -gap)
         ])
-        textWidthConstraint = widthConstraint
         label = tf
         panel = p
 
@@ -249,46 +232,7 @@ final class FloatingPanelController {
         p.contentView?.layer?.anchorPoint = CGPoint(x: 0.5, y: 0.5)
     }
 
-    // MARK: - Layout
-
-    private func updateTextWidth(animated: Bool) {
-        guard let label, let constraint = textWidthConstraint, let panel else { return }
-        let sizer = NSTextField(labelWithString: label.stringValue)
-        sizer.font = label.font
-        let needed = min(max(sizer.intrinsicContentSize.width + 8, minTextWidth), maxTextWidth)
-        let newPanelWidth = horizontalPadding * 2 + waveformWidth + gap + needed
-
-        if animated {
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.25
-                ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                constraint.animator().constant = needed
-                panel.animator().setFrame(
-                    NSRect(x: panel.frame.minX, y: panel.frame.minY,
-                           width: newPanelWidth, height: panelHeight),
-                    display: true
-                )
-            }
-        } else {
-            constraint.constant = needed
-            panel.setFrame(
-                NSRect(x: panel.frame.minX, y: panel.frame.minY,
-                       width: newPanelWidth, height: panelHeight),
-                display: false
-            )
-        }
-    }
-
-    private func positionPanel() {
-        guard let panel, let screen = NSScreen.main else { return }
-        let x = screen.visibleFrame.midX - panel.frame.width / 2
-        let y = screen.visibleFrame.maxY - panel.frame.height - 12
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
-    }
-
     // MARK: - Status Indicator Animation
-
-    private var pulseAnimation: CABasicAnimation?
 
     private func startStatusPulse() {
         guard let dotLayer = statusIndicator?.layer else { return }
@@ -301,11 +245,9 @@ final class FloatingPanelController {
         pulse.repeatCount = .infinity
         pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         dotLayer.add(pulse, forKey: "pulse")
-        pulseAnimation = pulse
     }
 
     private func stopStatusPulse() {
         statusIndicator?.layer?.removeAnimation(forKey: "pulse")
-        pulseAnimation = nil
     }
 }
