@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let panel = FloatingPanelController()
     private let injector = TextInjector()
     private let llmClient = LLMClient()
+    private var refinementTask: Task<Void, Never>?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuBar.setup()
@@ -39,8 +40,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     apiKey: settings.llmAPIKey,
                     model: settings.llmModel
                 )
-                Task {
+                refinementTask?.cancel()
+                refinementTask = Task {
                     let refined = (try? await self.llmClient.refine(text: rawText, config: config)) ?? rawText
+                    guard !Task.isCancelled else { return }
                     await MainActor.run {
                         self.panel.updateTranscription(refined)
                         self.panel.hide()

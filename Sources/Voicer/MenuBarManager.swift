@@ -1,6 +1,6 @@
 import AppKit
 
-final class MenuBarManager {
+final class MenuBarManager: NSObject {
     private var statusItem: NSStatusItem!
     private var llmToggleItem: NSMenuItem!
     private var languageItems: [NSMenuItem] = []
@@ -84,8 +84,18 @@ final class MenuBarManager {
     @objc private func openLLMSettings() {
         if settingsWindowController == nil {
             settingsWindowController = LLMSettingsWindowController()
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(settingsWindowClosed),
+                name: NSWindow.willCloseNotification,
+                object: settingsWindowController?.window
+            )
         }
         settingsWindowController?.showWindow(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
+    }
+
+    @objc private func settingsWindowClosed() {
+        settingsWindowController = nil
     }
 }
