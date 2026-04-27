@@ -11,11 +11,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuBar.setup()
-        menuBar.onLanguageChange = { [weak self] id in
-            self?.coordinator.updateLanguage(id)
-        }
-
-        coordinator.updateLanguage(AppSettings.shared.language)
 
         coordinator.onRecordingStarted = { [weak self] in
             self?.panel.showRecording()
@@ -29,14 +24,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.panel.updateTranscription(text)
         }
 
+        coordinator.onProcessingState = { [weak self] message in
+            self?.panel.showProcessing(message: message)
+        }
+
         coordinator.onRecordingStopped = { [weak self] rawText in
             guard let self else { return }
             let settings = AppSettings.shared
 
             if settings.llmEnabled && !settings.llmAPIKey.isEmpty && !rawText.isEmpty {
-                panel.showRefining()
+                panel.showProcessing(message: "正在润色…")
+                let provider = LLMProvider.provider(named: settings.llmProviderName)
+                let baseURL = provider.name == "Custom" ? settings.llmBaseURL : provider.baseURL
                 let config = LLMClient.Config(
-                    baseURL: settings.llmBaseURL,
+                    baseURL: baseURL,
                     apiKey: settings.llmAPIKey,
                     model: settings.llmModel
                 )
@@ -45,7 +46,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     let refined = (try? await self.llmClient.refine(text: rawText, config: config)) ?? rawText
                     guard !Task.isCancelled else { return }
                     await MainActor.run {
-                        self.panel.updateTranscription(refined)
                         self.panel.hide()
                         self.injector.inject(refined)
                     }
